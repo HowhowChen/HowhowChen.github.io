@@ -22,6 +22,7 @@ minify: false
 # Define custom file paths.
 # Create your custom files in site directory `source/_data` and uncomment needed files below.
 custom_file_path:
+  bodyEnd: source/_data/body-end.njk
   #head: source/_data/head.swig
   #header: source/_data/header.swig
   #sidebar: source/_data/sidebar.swig
@@ -33,6 +34,7 @@ custom_file_path:
   #mixin: source/_data/mixins.styl
   #style: source/_data/styles.styl
 
+snow_effect: true
 
 # ---------------------------------------------------------------
 # Site Information Settings
