@@ -123,4 +123,4 @@ deploy:
   type: git
   repo: https://github.com/HowhowChen/HowhowChen.github.io.git
   branch: gh-pages
-  message: "feat: add  golang photo"
+  message: "docs: add docker instruction v1"
