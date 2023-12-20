@@ -121,6 +121,6 @@ symbols_count_time:
 ## Docs: https://hexo.io/docs/one-command-deployment
 deploy:
   type: git
-  repo: https://github.com/HowhowChen/HowhowChen.github.io.git
+  repo: git@github.com:HowhowChen/HowhowChen.github.io.git
   branch: gh-pages
-  message: "docs: add docker instruction v1"
+  message: "docs: add golang worker pool v1"
