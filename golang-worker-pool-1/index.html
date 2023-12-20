@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/golang.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/golang-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/golang-16x16.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-B5M8X3XDHT"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-B5M8X3XDHT');
+</script>
+
+  <meta name="description" content="優化Worker Pool的奇技淫巧 圖片來源https:&#x2F;&#x2F;itnext.io&#x2F;explain-to-me-go-concurrency-worker-pool-pattern-like-im-five-e5f1be71">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Golang Worker Pool練習-1">
+<meta property="og:url" content="http://example.com/golang-worker-pool-1/">
+<meta property="og:site_name" content="Howhow Project">
+<meta property="og:description" content="優化Worker Pool的奇技淫巧 圖片來源https:&#x2F;&#x2F;itnext.io&#x2F;explain-to-me-go-concurrency-worker-pool-pattern-like-im-five-e5f1be71">
+<meta property="og:locale" content="zh_TW">
+<meta property="og:image" content="https://miro.medium.com/v2/resize:fit:720/format:webp/1*Ya3fa36roBBhZlMl-kChXw.png">
+<meta property="article:published_time" content="2023-12-20T16:58:54.000Z">
+<meta property="article:modified_time" content="2023-12-20T17:54:51.847Z">
+<meta property="article:author" content="Howhow Chen">
+<meta property="article:tag" content="Golang">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://miro.medium.com/v2/resize:fit:720/format:webp/1*Ya3fa36roBBhZlMl-kChXw.png">
+
+<link rel="canonical" href="http://example.com/golang-worker-pool-1/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-TW'
+  };
+</script>
+
+  <title>Golang Worker Pool練習-1 | Howhow Project - </title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-B5M8X3XDHT"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-B5M8X3XDHT');
+      }
+    </script>
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js">
+  <script type="text/javascript" src="/js/myjs/snow.js"></script>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切換導航欄">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Howhow Project</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首頁</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>關於</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>標籤</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分類</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>歸檔</a>
+
+  </li>
+      <div class="links-of-author motion-element">
+          <span class="links-of-author-item">
+            <a href="https://github.com/HowhowChen" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;HowhowChen" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+          </span>
+      </div>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-TW">
+    <link itemprop="mainEntityOfPage" href="http://example.com/golang-worker-pool-1/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="https://cdn.dribbble.com/userupload/2624051/file/original-0c2e27a535ca15358be82cb68805de49.png?compress=1&resize=1200x900">
+      <meta itemprop="name" content="Howhow Chen">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Howhow Project">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Golang Worker Pool練習-1
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">發表於</span>
+              
+
+              <time title="創建時間：2023-12-21 00:58:54 / 修改時間：01:54:51" itemprop="dateCreated datePublished" datetime="2023-12-21T00:58:54+08:00">2023-12-21</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分類於</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Golang/" itemprop="url" rel="index"><span itemprop="name">Golang</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Golang/Worker-Pool/" itemprop="url" rel="index"><span itemprop="name">Worker Pool</span></a>
+                </span>
+            </span>
+
+          
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="far fa-comment"></i>
+      </span>
+      <span class="post-meta-item-text">Disqus：</span>
+    
+    <a title="disqus" href="/golang-worker-pool-1/#disqus_thread" itemprop="discussionUrl">
+      <span class="post-comments-count disqus-comment-count" data-disqus-identifier="golang-worker-pool-1/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+            <span class="post-meta-item" title="文章字數">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+              <span>3.4k</span>
+            </span>
+            <span class="post-meta-item" title="所需閱讀時間">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+              <span>2 分鐘</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="優化Worker-Pool的奇技淫巧"><a href="#優化Worker-Pool的奇技淫巧" class="headerlink" title="優化Worker Pool的奇技淫巧"></a>優化Worker Pool的奇技淫巧</h2><p><img src="https://miro.medium.com/v2/resize:fit:720/format:webp/1*Ya3fa36roBBhZlMl-kChXw.png"></p>
+<center>圖片來源https://itnext.io/explain-to-me-go-concurrency-worker-pool-pattern-like-im-five-e5f1be71</center>
+<span id="more"></span>
+
+<h3 id="題目說明"><a href="#題目說明" class="headerlink" title="題目說明"></a>題目說明</h3><p>設計一個隨機生成亂數，計算亂數每一位數字總和（e.g. 69 &#x3D;&gt; 6+9&#x3D;15）。並請開啟一個Goroutine生成亂數，24個Goroutine計算亂數每一位數字總和。<strong>Bonus 五秒後關閉所有Goroutine。</strong></p>
+<p>詳見<a target="_blank" rel="noopener" href="https://blog.51cto.com/u_15127617/3300755">題目來源</a></p>
+<h3 id="優化結果"><a href="#優化結果" class="headerlink" title="優化結果"></a>優化結果</h3><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> main</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> (</span><br><span class="line">    <span class="string">&quot;fmt&quot;</span></span><br><span class="line">    <span class="string">&quot;time&quot;</span></span><br><span class="line">    <span class="string">&quot;math/rand&quot;</span></span><br><span class="line">    <span class="string">&quot;context&quot;</span></span><br><span class="line">    <span class="string">&quot;sync&quot;</span></span><br><span class="line">    <span class="string">&quot;runtime&quot;</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="keyword">type</span> Job <span class="keyword">struct</span> &#123;</span><br><span class="line">    Num <span class="type">int64</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">type</span> ResJob <span class="keyword">struct</span> &#123;</span><br><span class="line">    JobPtr  *Job</span><br><span class="line">    Sum     <span class="type">int64</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">Generate</span><span class="params">(ctx context.Context, jobChan <span class="keyword">chan</span>&lt;- *Job)</span></span> &#123;</span><br><span class="line">    <span class="keyword">for</span> &#123;</span><br><span class="line">        <span class="keyword">select</span> &#123;</span><br><span class="line">        <span class="keyword">case</span> &lt;-ctx.Done():</span><br><span class="line">            fmt.Println(<span class="string">&quot;Genereate done&quot;</span>)</span><br><span class="line">            <span class="keyword">return</span></span><br><span class="line">        <span class="keyword">default</span>:</span><br><span class="line">            num := rand.Int63()</span><br><span class="line">            job := &amp;Job&#123;Num: num&#125;</span><br><span class="line">            jobChan &lt;- job</span><br><span class="line">        &#125;</span><br><span class="line">    &#125; </span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">Calculate</span><span class="params">(ctx context.Context, jobChan &lt;-<span class="keyword">chan</span> *Job, resChan <span class="keyword">chan</span>&lt;- *ResJob)</span></span> &#123;</span><br><span class="line">    <span class="keyword">for</span> &#123;</span><br><span class="line">        <span class="keyword">select</span> &#123;</span><br><span class="line">        <span class="keyword">case</span> &lt;-ctx.Done():</span><br><span class="line">            fmt.Println(<span class="string">&quot;Calculate done&quot;</span>)</span><br><span class="line">            <span class="keyword">return</span></span><br><span class="line">        <span class="keyword">default</span>:</span><br><span class="line">            job := &lt;-jobChan</span><br><span class="line">            n := job.Num</span><br><span class="line">            sum := <span class="type">int64</span>(<span class="number">0</span>)</span><br><span class="line">            <span class="keyword">for</span> n &gt; <span class="number">0</span> &#123;</span><br><span class="line">                sum += n % <span class="number">10</span></span><br><span class="line">                n = n / <span class="number">10</span></span><br><span class="line">            &#125;</span><br><span class="line">            </span><br><span class="line">            res := &amp;ResJob&#123;</span><br><span class="line">                JobPtr: job,</span><br><span class="line">                Sum:    sum,</span><br><span class="line">            &#125;</span><br><span class="line">            resChan &lt;- res</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">    <span class="keyword">defer</span> fmt.Println(<span class="string">&quot;NumGoroutine: &quot;</span>, runtime.NumGoroutine())</span><br><span class="line"></span><br><span class="line">    duration := time.Now().Add(time.Second * <span class="number">5</span>)</span><br><span class="line">    ctx, cancel := context.WithDeadline(context.Background(), duration)</span><br><span class="line">    <span class="keyword">defer</span> cancel()</span><br><span class="line"></span><br><span class="line">    <span class="keyword">var</span> jobChan = <span class="built_in">make</span>(<span class="keyword">chan</span> *Job, <span class="number">100</span>)</span><br><span class="line">    <span class="keyword">var</span> resChan = <span class="built_in">make</span>(<span class="keyword">chan</span> *ResJob, <span class="number">100</span>)</span><br><span class="line">    <span class="keyword">var</span> wg sync.WaitGroup</span><br><span class="line"></span><br><span class="line">    <span class="keyword">go</span> Generate(ctx, jobChan)</span><br><span class="line"></span><br><span class="line">    numCalculators := <span class="number">24</span></span><br><span class="line">    wg.Add(numCalculators)</span><br><span class="line">    <span class="keyword">for</span> i := <span class="number">0</span>; i &lt; numCalculators; i++ &#123;</span><br><span class="line">        <span class="keyword">go</span> <span class="function"><span class="keyword">func</span><span class="params">()</span></span> &#123;</span><br><span class="line">            <span class="keyword">defer</span> wg.Done()</span><br><span class="line">            Calculate(ctx, jobChan, resChan)</span><br><span class="line">        &#125;()</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">go</span> <span class="function"><span class="keyword">func</span><span class="params">()</span></span> &#123;</span><br><span class="line">        wg.Wait()</span><br><span class="line">        <span class="built_in">close</span>(resChan)</span><br><span class="line">    &#125;()</span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span> &#123;</span><br><span class="line">        <span class="keyword">select</span> &#123;</span><br><span class="line">        <span class="keyword">case</span> &lt;-ctx.Done():</span><br><span class="line">            fmt.Println(<span class="string">&quot;Context done&quot;</span>)</span><br><span class="line">            <span class="keyword">for</span> &#123;</span><br><span class="line">                _, ok := &lt;-resChan</span><br><span class="line">                <span class="keyword">if</span> !ok &#123;</span><br><span class="line">                    fmt.Println(<span class="string">&quot;ResChan closed&quot;</span>)</span><br><span class="line">                    <span class="keyword">break</span></span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">            </span><br><span class="line">            <span class="keyword">return</span></span><br><span class="line">        <span class="keyword">case</span> job := &lt;-resChan:</span><br><span class="line">            fmt.Printf(<span class="string">&quot;%v&#x27;s the result is: %v\n&quot;</span>, job.JobPtr.Num, job.Sum)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="優化思路"><a href="#優化思路" class="headerlink" title="優化思路"></a>優化思路</h3><ol>
+<li>使用context上下文控制goroutine狀態<br>題目bonus思路規定5秒後關閉。</li>
+</ol>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">duration := time.Now().Add(time.Second * <span class="number">5</span>)</span><br><span class="line">ctx, cancel := context.WithDeadline(context.Background(), duration)</span><br><span class="line"><span class="keyword">defer</span> cancel()</span><br></pre></td></tr></table></figure>
+
+<ol start="2">
+<li>使用sync.WaitGroup確保所有goroutine退出前完成所有工作</li>
+</ol>
+<ul>
+<li>加入close(resChan)可以優化以下項目：<ul>
+<li>節省資源：關閉通道可以釋放相關資源。當不再需要使用通道時，關閉它可以讓垃圾回收機制回收相關資源。</li>
+<li>通知接收者：確保不會再有resJob被送入resChan。</li>
+</ul>
+</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">numCalculators := <span class="number">24</span></span><br><span class="line">wg.Add(numCalculators)</span><br><span class="line"></span><br><span class="line"><span class="keyword">for</span> i := <span class="number">0</span>; i &lt; numCalculators; i++ &#123;</span><br><span class="line">    <span class="keyword">go</span> <span class="function"><span class="keyword">func</span><span class="params">()</span></span> &#123;</span><br><span class="line">        <span class="keyword">defer</span> wg.Done()</span><br><span class="line">        Calculate(ctx, jobChan, resChan)</span><br><span class="line">    &#125;()</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">go</span> <span class="function"><span class="keyword">func</span><span class="params">()</span></span> &#123;</span><br><span class="line">    wg.Wait()</span><br><span class="line">    <span class="built_in">close</span>(resChan)</span><br><span class="line">&#125;()</span><br></pre></td></tr></table></figure>
+
+<ol start="3">
+<li>接收resChan加入select機制判斷<br>如若使用原先for job :&#x3D; range resChan 會造成邊關閉goroutine同時還在透由channel獲取資料，有概率會deadlock。</li>
+</ol>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> &#123;</span><br><span class="line">    <span class="keyword">select</span> &#123;</span><br><span class="line">    <span class="keyword">case</span> &lt;-ctx.Done():</span><br><span class="line">        fmt.Println(<span class="string">&quot;Context done&quot;</span>)</span><br><span class="line">        <span class="keyword">for</span> &#123;</span><br><span class="line">            _, ok := &lt;-resChan</span><br><span class="line">            <span class="keyword">if</span> !ok &#123;</span><br><span class="line">                fmt.Println(<span class="string">&quot;ResChan closed&quot;</span>)</span><br><span class="line">                <span class="keyword">break</span></span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span></span><br><span class="line">    <span class="keyword">case</span> job := &lt;-resChan:</span><br><span class="line">        fmt.Printf(<span class="string">&quot;%v&#x27;s the result is: %v\n&quot;</span>, job.JobPtr.Num, job.Sum)</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ol start="4">
+<li>兩個goroutine func加入select及context<br>新增select判讀context是否傳遞關閉訊息並跳出迴圈。</li>
+</ol>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> &#123;</span><br><span class="line"><span class="keyword">case</span> &lt;-ctx.Done():</span><br><span class="line">    fmt.Println(<span class="string">&quot;Calculate done&quot;</span>)</span><br><span class="line">    <span class="keyword">return</span></span><br><span class="line"><span class="keyword">default</span>:</span><br><span class="line">    job := &lt;-jobChan</span><br><span class="line">    n := job.num</span><br><span class="line">    sum := <span class="type">int64</span>(<span class="number">0</span>)</span><br><span class="line">    <span class="keyword">for</span> n &gt; <span class="number">0</span> &#123;</span><br><span class="line">        sum += n % <span class="number">10</span></span><br><span class="line">        n = n / <span class="number">10</span></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    res := &amp;ResJob&#123;</span><br><span class="line">        JobPtr: job,</span><br><span class="line">        Sum:    sum,</span><br><span class="line">    &#125;</span><br><span class="line">    resChan &lt;- res</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="心得"><a href="#心得" class="headerlink" title="心得"></a>心得</h3><p>身為一位Gopher Goroutine及Channel是必須非常熟悉的項目，透由練習優化Worker Pool可以加深自己對Golang的認識。參考的題目是沒有設定停止機制，無限循環生成亂數及計算每位數字總和;這邊優化方向為增加停止機制並使所有Goroutine能正常關閉。可以讓剛入門GO語言的朋友參考。</p>
+
+    </div>
+
+    
+    
+    
+        
+
+<div>
+<ul class="post-copyright">
+  <!--
+  <li class="post-copyright-author">
+    <strong>作者： </strong>Howhow Chen
+  </li>
+  <li class="post-copyright-link">
+    <strong>文章連結：</strong>
+    <a href="http://example.com/golang-worker-pool-1/" title="Golang Worker Pool練習-1">http://example.com/golang-worker-pool-1/</a>
+  </li>
+  -->
+  <li class="post-copyright-license">
+    <strong>版權聲明： </strong>本網誌所有文章除特別聲明外，均採用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 許可協議。轉載請註明出處！
+  </li>
+</ul>
+</div>
+
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Golang/" rel="tag"># Golang</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/docker-instruction/" rel="prev" title="Docker超入門">
+      <i class="fa fa-chevron-left"></i> Docker超入門
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+    
+  <div class="comments">
+    <div id="disqus_thread">
+      <noscript>Please enable JavaScript to view the comments powered by Disqus.</noscript>
+    </div>
+  </div>
+  
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目錄
+        </li>
+        <li class="sidebar-nav-overview">
+          本站概要
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%84%AA%E5%8C%96Worker-Pool%E7%9A%84%E5%A5%87%E6%8A%80%E6%B7%AB%E5%B7%A7"><span class="nav-number">1.</span> <span class="nav-text">優化Worker Pool的奇技淫巧</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%A1%8C%E7%9B%AE%E8%AA%AA%E6%98%8E"><span class="nav-number">1.1.</span> <span class="nav-text">題目說明</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%84%AA%E5%8C%96%E7%B5%90%E6%9E%9C"><span class="nav-number">1.2.</span> <span class="nav-text">優化結果</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%84%AA%E5%8C%96%E6%80%9D%E8%B7%AF"><span class="nav-number">1.3.</span> <span class="nav-text">優化思路</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BF%83%E5%BE%97"><span class="nav-number">1.4.</span> <span class="nav-text">心得</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Howhow Chen"
+      src="https://cdn.dribbble.com/userupload/2624051/file/original-0c2e27a535ca15358be82cb68805de49.png?compress=1&resize=1200x900">
+  <p class="site-author-name" itemprop="name">Howhow Chen</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">3</span>
+          <span class="site-state-item-name">文章</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">分類</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">4</span>
+        <span class="site-state-item-name">標籤</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/HowhowChen" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;HowhowChen" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder"><a target="_blank" rel="noopener" href='https://github.com/HowhowChen'>Howhow</a></span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 強力驅動
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+<script>
+  function loadCount() {
+    var d = document, s = d.createElement('script');
+    s.src = 'https://howhowproject.disqus.com/count.js';
+    s.id = 'dsq-count-scr';
+    (d.head || d.body).appendChild(s);
+  }
+  // defer loading until the whole page loading is completed
+  window.addEventListener('load', loadCount, false);
+</script>
+<script>
+  var disqus_config = function() {
+    this.page.url = "http://example.com/golang-worker-pool-1/";
+    this.page.identifier = "golang-worker-pool-1/";
+    this.page.title = "Golang Worker Pool練習-1";
+    this.language = "zh_TW";
+    };
+  NexT.utils.loadComments(document.querySelector('#disqus_thread'), () => {
+    if (window.DISQUS) {
+      DISQUS.reset({
+        reload: true,
+        config: disqus_config
+      });
+    } else {
+      var d = document, s = d.createElement('script');
+      s.src = 'https://howhowproject.disqus.com/embed.js';
+      s.setAttribute('data-timestamp', '' + +new Date());
+      (d.head || d.body).appendChild(s);
+    }
+  });
+</script>
+
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js">
+  <script type="text/javascript" src="/js/myjs/snow.js"></script>
+
+
+</body>
+</html>
