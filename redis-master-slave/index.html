@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/golang.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/golang-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/golang-16x16.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-B5M8X3XDHT"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-B5M8X3XDHT');
+</script>
+
+  <meta name="description" content="Redis 三部曲之首部曲-主從模式（Master-Slave）">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Redis Master Slave">
+<meta property="og:url" content="http://example.com/redis-master-slave/">
+<meta property="og:site_name" content="Howhow Project">
+<meta property="og:description" content="Redis 三部曲之首部曲-主從模式（Master-Slave）">
+<meta property="og:locale" content="zh_TW">
+<meta property="og:image" content="https://i.imgur.com/Gqn4luk.png">
+<meta property="og:image" content="https://i.imgur.com/4GlZICz.png">
+<meta property="article:published_time" content="2023-12-27T17:54:37.000Z">
+<meta property="article:modified_time" content="2023-12-27T18:56:18.039Z">
+<meta property="article:author" content="Howhow Chen">
+<meta property="article:tag" content="Redis">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://i.imgur.com/Gqn4luk.png">
+
+<link rel="canonical" href="http://example.com/redis-master-slave/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-TW'
+  };
+</script>
+
+  <title>Redis Master Slave | Howhow Project - </title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-B5M8X3XDHT"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-B5M8X3XDHT');
+      }
+    </script>
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js">
+  <script type="text/javascript" src="/js/myjs/snow.js"></script>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切換導航欄">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Howhow Project</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首頁</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>關於</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>標籤</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分類</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>歸檔</a>
+
+  </li>
+      <div class="links-of-author motion-element">
+          <span class="links-of-author-item">
+            <a href="https://github.com/HowhowChen" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;HowhowChen" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+          </span>
+      </div>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-TW">
+    <link itemprop="mainEntityOfPage" href="http://example.com/redis-master-slave/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="https://cdn.dribbble.com/userupload/2624051/file/original-0c2e27a535ca15358be82cb68805de49.png?compress=1&resize=1200x900">
+      <meta itemprop="name" content="Howhow Chen">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Howhow Project">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Redis Master Slave
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">發表於</span>
+              
+
+              <time title="創建時間：2023-12-28 01:54:37 / 修改時間：02:56:18" itemprop="dateCreated datePublished" datetime="2023-12-28T01:54:37+08:00">2023-12-28</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分類於</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Redis/" itemprop="url" rel="index"><span itemprop="name">Redis</span></a>
+                </span>
+            </span>
+
+          
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="far fa-comment"></i>
+      </span>
+      <span class="post-meta-item-text">Disqus：</span>
+    
+    <a title="disqus" href="/redis-master-slave/#disqus_thread" itemprop="discussionUrl">
+      <span class="post-comments-count disqus-comment-count" data-disqus-identifier="redis-master-slave/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+            <span class="post-meta-item" title="文章字數">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+              <span>4.2k</span>
+            </span>
+            <span class="post-meta-item" title="所需閱讀時間">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+              <span>3 分鐘</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="Redis-三部曲之首部曲-主從模式（Master-Slave）"><a href="#Redis-三部曲之首部曲-主從模式（Master-Slave）" class="headerlink" title="Redis 三部曲之首部曲-主從模式（Master-Slave）"></a>Redis 三部曲之首部曲-主從模式（Master-Slave）</h2><p><img src="https://i.imgur.com/Gqn4luk.png" alt="redis-scaling.drawio"></p>
+<span id="more"></span>
+
+<h3 id="說明"><a href="#說明" class="headerlink" title="說明"></a>說明</h3><p>主從（Master-Slave）模式提供讓 Master（主節點） 向任意數量的 Slave（附節點) 進行資料同步，以解決單點資料庫的問題，減輕主節點的負載壓力。主從複製模式最主要的目的是要實現讀寫分離和資料備份。Redis 讀寫分離的作法是 Master 可以進行讀取和寫入，其他的 Slave 只能讀取（試圖寫入會出現READONLY You can’t write against a read only replica.錯誤訊息）。透過 Slave 幫忙處理讀取的工作來減輕 Master 的負擔。</p>
+<h3 id="檔案架構"><a href="#檔案架構" class="headerlink" title="檔案架構"></a>檔案架構</h3><p><img src="https://i.imgur.com/4GlZICz.png" alt="image"></p>
+<ul>
+<li>docker-compose.yaml: 建立redis相關容器。</li>
+<li>redis-shard： 儲存各redis永久數據，不會因為誤砍container而消失。</li>
+</ul>
+<h3 id="實作"><a href="#實作" class="headerlink" title="實作"></a>實作</h3><p><a target="_blank" rel="noopener" href="https://github.com/HowhowChen/redis-project/tree/main/redis-master-slave">完整程式碼</a></p>
+<ol>
+<li>新增volume儲存位置</li>
+</ol>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">mkdir redis-shard &amp;&amp; mkdir redis-shard/redis-master0 \</span><br><span class="line">redis-shard/redis-slave0 \</span><br><span class="line">redis-shard/redis-slave1</span><br></pre></td></tr></table></figure>
+<ol start="2">
+<li>容器規劃</li>
+</ol>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">version:</span> <span class="string">&#x27;3.4&#x27;</span></span><br><span class="line"><span class="attr">services:</span></span><br><span class="line">  <span class="attr">redis-master0:</span></span><br><span class="line">    <span class="attr">image:</span> <span class="string">redis</span></span><br><span class="line">    <span class="attr">container_name:</span> <span class="string">redis-master0</span></span><br><span class="line">    <span class="attr">restart:</span> <span class="string">always</span></span><br><span class="line">    <span class="attr">volumes:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">./redis-shard/redis-master0:/data</span></span><br><span class="line">    <span class="attr">ports:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="number">6379</span><span class="string">:6379</span></span><br><span class="line">    <span class="attr">networks:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">redis-net</span></span><br><span class="line"></span><br><span class="line">  <span class="attr">redis-slave0:</span></span><br><span class="line">    <span class="attr">image:</span> <span class="string">redis</span></span><br><span class="line">    <span class="attr">container_name:</span> <span class="string">redis-slave0</span></span><br><span class="line">    <span class="attr">restart:</span> <span class="string">always</span></span><br><span class="line">    <span class="attr">volumes:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">./redis-shard/redis-slave0:/data</span></span><br><span class="line">    <span class="attr">ports:</span> </span><br><span class="line">      <span class="bullet">-</span> <span class="number">9001</span><span class="string">:9001</span></span><br><span class="line">    <span class="attr">networks:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">redis-net</span></span><br><span class="line">    <span class="attr">command:</span> <span class="string">redis-server</span> <span class="string">--port</span> <span class="number">9001</span> <span class="string">--slaveof</span> <span class="string">redis-master0</span> <span class="number">6379</span></span><br><span class="line">    <span class="attr">depends_on:</span> </span><br><span class="line">      <span class="bullet">-</span> <span class="string">redis-master0</span></span><br><span class="line"></span><br><span class="line">  <span class="attr">redis-slave1:</span></span><br><span class="line">    <span class="attr">image:</span> <span class="string">redis</span></span><br><span class="line">    <span class="attr">container_name:</span> <span class="string">redis-slave1</span></span><br><span class="line">    <span class="attr">restart:</span> <span class="string">always</span></span><br><span class="line">    <span class="attr">volumes:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">./redis-shard/redis-slave1:/data</span></span><br><span class="line">    <span class="attr">ports:</span> </span><br><span class="line">      <span class="bullet">-</span> <span class="number">9002</span><span class="string">:9002</span></span><br><span class="line">    <span class="attr">networks:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">redis-net</span></span><br><span class="line">    <span class="attr">command:</span> <span class="string">redis-server</span> <span class="string">--port</span> <span class="number">9002</span> <span class="string">--slaveof</span> <span class="string">redis-master0</span> <span class="number">6379</span></span><br><span class="line">    <span class="attr">depends_on:</span> </span><br><span class="line">      <span class="bullet">-</span> <span class="string">redis-master0</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">redis-slave0</span></span><br><span class="line"></span><br><span class="line"><span class="attr">networks:</span></span><br><span class="line">  <span class="attr">redis-net:</span></span><br><span class="line">    <span class="attr">name:</span> <span class="string">redis-scaling-network</span></span><br></pre></td></tr></table></figure>
+
+<ol start="3">
+<li>查詢replication info<br>確認connected_slaves數量及slave相關資訊是否正確。</li>
+</ol>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">docker exec -it redis-master0 redis-cli info replication</span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">Replication</span></span><br><span class="line">role:master</span><br><span class="line">connected_slaves:2</span><br><span class="line">slave0:ip=192.168.112.3,port=9001,state=online,offset=794,lag=0</span><br><span class="line">slave1:ip=192.168.112.4,port=9002,state=online,offset=794,lag=1</span><br><span class="line">master_failover_state:no-failover</span><br><span class="line">master_replid:90ece01a700c4d5b0df6d36fb6498b437524174d</span><br><span class="line">master_replid2:0000000000000000000000000000000000000000</span><br><span class="line">master_repl_offset:794</span><br><span class="line">second_repl_offset:-1</span><br><span class="line">repl_backlog_active:1</span><br><span class="line">repl_backlog_size:1048576</span><br><span class="line">repl_backlog_first_byte_offset:1</span><br><span class="line">repl_backlog_histlen:794</span><br></pre></td></tr></table></figure>
+
+<ol start="4">
+<li>建立資料及查詢<br>寫入資料至redis-master0後，確認是否有同步至redis-slave0及redis-slave1。</li>
+</ol>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">docker exec -it redis-master0 redis-cli set k1 v1</span><br><span class="line">OK</span><br><span class="line">docker exec -it redis-slave0 redis-cli -p 9001 get k1</span><br><span class="line">&quot;v1&quot;</span><br><span class="line">docker exec -it redis-slave1 redis-cli -p 9002 get k1</span><br><span class="line">&quot;v1&quot;</span><br></pre></td></tr></table></figure>
+
+<h3 id="建立流程"><a href="#建立流程" class="headerlink" title="建立流程"></a>建立流程</h3><p>以下以redis-master0與redis-slave0之間為例子做說明</p>
+<ol>
+<li><p>redis-slave0 啟動之後會主動向 redis-master0 發送 Sync 命令要求進行同步。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">redis-slave0   | 1:S 27 Dec 2023 15:14:38.607 * MASTER &lt;-&gt; REPLICA sync started</span><br><span class="line">redis-slave0   | 1:S 27 Dec 2023 15:14:38.607 * Non blocking connect for SYNC fired the event.</span><br><span class="line">redis-slave0   | 1:S 27 Dec 2023 15:14:38.608 * Master replied to PING, replication can continue...</span><br><span class="line">redis-slave0   | 1:S 27 Dec 2023 15:14:38.608 * Partial resynchronization not possible (no cached master)</span><br></pre></td></tr></table></figure></li>
+<li><p>redis-master0 收到之後會執行 Bgsave 命令建立 rdb 快照檔案儲存到硬碟。同時，Master 會把新收到的寫入和修改資料庫的命令存到緩衝區。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">redis-master0  | 1:M 27 Dec 2023 15:14:38.609 * Replica 192.168.112.3:9001 asks for synchronization</span><br><span class="line">redis-master0  | 1:M 27 Dec 2023 15:14:38.609 * Full resync requested by replica 192.168.112.3:9001</span><br><span class="line">redis-master0  | 1:M 27 Dec 2023 15:14:38.609 * Replication backlog created, my new replication IDs are &#x27;90ece01a700c4d5b0df6d36fb6498b437524174d&#x27; and &#x27;0000000000000000000000000000000000000000&#x27;</span><br><span class="line">redis-master0  | 1:M 27 Dec 2023 15:14:38.609 * Delay next BGSAVE for diskless SYNC</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>redis-master0 會將剛建立好的快照檔案傳給 redis-slave0。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">redis-master0  | 1:M 27 Dec 2023 15:14:43.744 * Starting BGSAVE for SYNC with target: replicas sockets</span><br><span class="line">redis-master0  | 1:M 27 Dec 2023 15:14:43.745 * Background RDB transfer started by pid 19</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>redis-slave0 收到快照檔案後會先把記憶體清空，接著載入收到的快照檔案。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">redis-slave0   | 1:S 27 Dec 2023 15:14:43.747 * MASTER &lt;-&gt; REPLICA sync: receiving streamed RDB from master with EOF to disk</span><br><span class="line">redis-slave0   | 1:S 27 Dec 2023 15:14:43.749 * MASTER &lt;-&gt; REPLICA sync: Flushing old data</span><br><span class="line">redis-slave0   | 1:S 27 Dec 2023 15:14:43.749 * MASTER &lt;-&gt; REPLICA sync: Loading DB in memory</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>redis-master0 會再把存在緩衝區的命令傳給 redis-slave0，redis-slave0 再執行這些命令以達成和 Master 同步。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">redis-master0  | 1:M 27 Dec 2023 15:14:43.754 * Background RDB transfer terminated with success</span><br><span class="line">redis-master0  | 1:M 27 Dec 2023 15:14:43.755 * Streamed RDB transfer with replica 192.168.112.3:9001 succeeded (socket). Waiting for REPLCONF ACK from replica to enable streaming</span><br><span class="line">redis-master0  | 1:M 27 Dec 2023 15:14:43.755 * Synchronization with replica 192.168.112.3:9001 succeeded</span><br></pre></td></tr></table></figure></li>
+</ol>
+<h3 id="心得"><a href="#心得" class="headerlink" title="心得"></a>心得</h3><p>許多大型網站在追求效能優化及低延遲性上會常用到Cache，而Redis是市場上最普片作為Cache的資料庫（in-memory），不管在效能還是操作上皆活躍於開源社群中。透由本次文章分想Redis在水平拓展的優化，減輕主節點負載壓力，提高在查詢上的效能，並做好備份工作降低系統異常容錯率。後續會分享剩下二部曲Sentinel、Cluster及Golang、Nodejs等介接Redis實例,敬請期待～</p>
+<h3 id="參考文章"><a href="#參考文章" class="headerlink" title="參考文章"></a>參考文章</h3><p><a target="_blank" rel="noopener" href="https://hackmd.io/@tienyulin/redis-master-slave-replication-sentinel-cluster">Redis (六) - 主從複製、哨兵與叢集模式</a><br><a target="_blank" rel="noopener" href="https://www.educba.com/redis-master-slave/">Redis Master Slave | How to Setup Redis Master and Slave Replication?</a></p>
+
+    </div>
+
+    
+    
+    
+        
+
+<div>
+<ul class="post-copyright">
+  <!--
+  <li class="post-copyright-author">
+    <strong>作者： </strong>Howhow Chen
+  </li>
+  <li class="post-copyright-link">
+    <strong>文章連結：</strong>
+    <a href="http://example.com/redis-master-slave/" title="Redis Master Slave">http://example.com/redis-master-slave/</a>
+  </li>
+  -->
+  <li class="post-copyright-license">
+    <strong>版權聲明： </strong>本網誌所有文章除特別聲明外，均採用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 許可協議。轉載請註明出處！
+  </li>
+</ul>
+</div>
+
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Redis/" rel="tag"># Redis</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/golang-worker-pool-1/" rel="prev" title="Golang Worker Pool練習-1">
+      <i class="fa fa-chevron-left"></i> Golang Worker Pool練習-1
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+    
+  <div class="comments">
+    <div id="disqus_thread">
+      <noscript>Please enable JavaScript to view the comments powered by Disqus.</noscript>
+    </div>
+  </div>
+  
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目錄
+        </li>
+        <li class="sidebar-nav-overview">
+          本站概要
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Redis-%E4%B8%89%E9%83%A8%E6%9B%B2%E4%B9%8B%E9%A6%96%E9%83%A8%E6%9B%B2-%E4%B8%BB%E5%BE%9E%E6%A8%A1%E5%BC%8F%EF%BC%88Master-Slave%EF%BC%89"><span class="nav-number">1.</span> <span class="nav-text">Redis 三部曲之首部曲-主從模式（Master-Slave）</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AA%AA%E6%98%8E"><span class="nav-number">1.1.</span> <span class="nav-text">說明</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AA%94%E6%A1%88%E6%9E%B6%E6%A7%8B"><span class="nav-number">1.2.</span> <span class="nav-text">檔案架構</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AF%A6%E4%BD%9C"><span class="nav-number">1.3.</span> <span class="nav-text">實作</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BB%BA%E7%AB%8B%E6%B5%81%E7%A8%8B"><span class="nav-number">1.4.</span> <span class="nav-text">建立流程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BF%83%E5%BE%97"><span class="nav-number">1.5.</span> <span class="nav-text">心得</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8F%83%E8%80%83%E6%96%87%E7%AB%A0"><span class="nav-number">1.6.</span> <span class="nav-text">參考文章</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Howhow Chen"
+      src="https://cdn.dribbble.com/userupload/2624051/file/original-0c2e27a535ca15358be82cb68805de49.png?compress=1&resize=1200x900">
+  <p class="site-author-name" itemprop="name">Howhow Chen</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">4</span>
+          <span class="site-state-item-name">文章</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">6</span>
+        <span class="site-state-item-name">分類</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">標籤</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/HowhowChen" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;HowhowChen" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder"><a target="_blank" rel="noopener" href='https://github.com/HowhowChen'>Howhow</a></span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 強力驅動
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+<script>
+  function loadCount() {
+    var d = document, s = d.createElement('script');
+    s.src = 'https://howhowproject.disqus.com/count.js';
+    s.id = 'dsq-count-scr';
+    (d.head || d.body).appendChild(s);
+  }
+  // defer loading until the whole page loading is completed
+  window.addEventListener('load', loadCount, false);
+</script>
+<script>
+  var disqus_config = function() {
+    this.page.url = "http://example.com/redis-master-slave/";
+    this.page.identifier = "redis-master-slave/";
+    this.page.title = "Redis Master Slave";
+    this.language = "zh_TW";
+    };
+  NexT.utils.loadComments(document.querySelector('#disqus_thread'), () => {
+    if (window.DISQUS) {
+      DISQUS.reset({
+        reload: true,
+        config: disqus_config
+      });
+    } else {
+      var d = document, s = d.createElement('script');
+      s.src = 'https://howhowproject.disqus.com/embed.js';
+      s.setAttribute('data-timestamp', '' + +new Date());
+      (d.head || d.body).appendChild(s);
+    }
+  });
+</script>
+
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js">
+  <script type="text/javascript" src="/js/myjs/snow.js"></script>
+
+
+</body>
+</html>
