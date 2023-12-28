@@ -123,4 +123,4 @@ deploy:
   type: git
   repo: git@github.com:HowhowChen/HowhowChen.github.io.git
   branch: gh-pages
-  message: "docs: add golang worker pool v1"
+  message: "docs: add redis master slave"
