@@ -37,14 +37,14 @@
 <meta property="og:site_name" content="Howhow Project">
 <meta property="og:description" content="Redis 三部曲之首部曲-主從模式（Master-Slave）">
 <meta property="og:locale" content="zh_TW">
-<meta property="og:image" content="https://i.imgur.com/Gqn4luk.png">
+<meta property="og:image" content="https://i.imgur.com/7r2r9bn.png">
 <meta property="og:image" content="https://i.imgur.com/4GlZICz.png">
 <meta property="article:published_time" content="2023-12-27T17:54:37.000Z">
-<meta property="article:modified_time" content="2023-12-27T18:56:18.039Z">
+<meta property="article:modified_time" content="2024-01-17T15:14:42.582Z">
 <meta property="article:author" content="Howhow Chen">
 <meta property="article:tag" content="Redis">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="https://i.imgur.com/Gqn4luk.png">
+<meta name="twitter:image" content="https://i.imgur.com/7r2r9bn.png">
 
 <link rel="canonical" href="http://example.com/redis-master-slave/">
 
@@ -218,10 +218,16 @@
                 <i class="far fa-calendar"></i>
               </span>
               <span class="post-meta-item-text">發表於</span>
-              
 
-              <time title="創建時間：2023-12-28 01:54:37 / 修改時間：02:56:18" itemprop="dateCreated datePublished" datetime="2023-12-28T01:54:37+08:00">2023-12-28</time>
+              <time title="創建時間：2023-12-28 01:54:37" itemprop="dateCreated datePublished" datetime="2023-12-28T01:54:37+08:00">2023-12-28</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新於</span>
+                <time title="修改時間：2024-01-17 23:14:42" itemprop="dateModified" datetime="2024-01-17T23:14:42+08:00">2024-01-17</time>
+              </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
                 <i class="far fa-folder"></i>
@@ -269,7 +275,7 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <h2 id="Redis-三部曲之首部曲-主從模式（Master-Slave）"><a href="#Redis-三部曲之首部曲-主從模式（Master-Slave）" class="headerlink" title="Redis 三部曲之首部曲-主從模式（Master-Slave）"></a>Redis 三部曲之首部曲-主從模式（Master-Slave）</h2><p><img src="https://i.imgur.com/Gqn4luk.png" alt="redis-scaling.drawio"></p>
+        <h2 id="Redis-三部曲之首部曲-主從模式（Master-Slave）"><a href="#Redis-三部曲之首部曲-主從模式（Master-Slave）" class="headerlink" title="Redis 三部曲之首部曲-主從模式（Master-Slave）"></a>Redis 三部曲之首部曲-主從模式（Master-Slave）</h2><p><img src="https://i.imgur.com/7r2r9bn.png" alt="redis-scaling.drawio"></p>
 <span id="more"></span>
 
 <h3 id="說明"><a href="#說明" class="headerlink" title="說明"></a>說明</h3><p>主從（Master-Slave）模式提供讓 Master（主節點） 向任意數量的 Slave（附節點) 進行資料同步，以解決單點資料庫的問題，減輕主節點的負載壓力。主從複製模式最主要的目的是要實現讀寫分離和資料備份。Redis 讀寫分離的作法是 Master 可以進行讀取和寫入，其他的 Slave 只能讀取（試圖寫入會出現READONLY You can’t write against a read only replica.錯誤訊息）。透過 Slave 幫忙處理讀取的工作來減輕 Master 的負擔。</p>
@@ -356,7 +362,10 @@
     <a href="/golang-worker-pool-1/" rel="prev" title="Golang Worker Pool練習-1">
       <i class="fa fa-chevron-left"></i> Golang Worker Pool練習-1
     </a></div>
-      <div class="post-nav-item"></div>
+      <div class="post-nav-item">
+    <a href="/redis-sentinel/" rel="next" title="Redis Sentinel">
+      Redis Sentinel <i class="fa fa-chevron-right"></i>
+    </a></div>
     </div>
       </footer>
     
@@ -438,7 +447,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">4</span>
+          <span class="site-state-item-count">5</span>
           <span class="site-state-item-name">文章</span>
         </a>
       </div>
@@ -483,7 +492,7 @@
 <div class="copyright">
   
   &copy; 
-  <span itemprop="copyrightYear">2023</span>
+  <span itemprop="copyrightYear">2024</span>
   <span class="with-love">
     <i class="fa fa-heart"></i>
   </span>

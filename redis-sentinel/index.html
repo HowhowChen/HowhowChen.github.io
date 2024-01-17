@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/golang.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/golang-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/golang-16x16.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-B5M8X3XDHT"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-B5M8X3XDHT');
+</script>
+
+  <meta name="description" content="Redis 三部曲之二部曲-哨兵模式（Sentinel）">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Redis Sentinel">
+<meta property="og:url" content="http://example.com/redis-sentinel/">
+<meta property="og:site_name" content="Howhow Project">
+<meta property="og:description" content="Redis 三部曲之二部曲-哨兵模式（Sentinel）">
+<meta property="og:locale" content="zh_TW">
+<meta property="og:image" content="https://i.imgur.com/APup1lq.png">
+<meta property="og:image" content="https://i.imgur.com/Gh8JDcT.png">
+<meta property="article:published_time" content="2024-01-16T15:59:42.000Z">
+<meta property="article:modified_time" content="2024-01-17T15:18:17.916Z">
+<meta property="article:author" content="Howhow Chen">
+<meta property="article:tag" content="Redis">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://i.imgur.com/APup1lq.png">
+
+<link rel="canonical" href="http://example.com/redis-sentinel/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-TW'
+  };
+</script>
+
+  <title>Redis Sentinel | Howhow Project - </title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-B5M8X3XDHT"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-B5M8X3XDHT');
+      }
+    </script>
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js">
+  <script type="text/javascript" src="/js/myjs/snow.js"></script>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切換導航欄">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Howhow Project</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首頁</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>關於</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>標籤</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分類</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>歸檔</a>
+
+  </li>
+      <div class="links-of-author motion-element">
+          <span class="links-of-author-item">
+            <a href="https://github.com/HowhowChen" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;HowhowChen" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+          </span>
+      </div>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-TW">
+    <link itemprop="mainEntityOfPage" href="http://example.com/redis-sentinel/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="https://cdn.dribbble.com/userupload/2624051/file/original-0c2e27a535ca15358be82cb68805de49.png?compress=1&resize=1200x900">
+      <meta itemprop="name" content="Howhow Chen">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Howhow Project">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Redis Sentinel
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">發表於</span>
+
+              <time title="創建時間：2024-01-16 23:59:42" itemprop="dateCreated datePublished" datetime="2024-01-16T23:59:42+08:00">2024-01-16</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新於</span>
+                <time title="修改時間：2024-01-17 23:18:17" itemprop="dateModified" datetime="2024-01-17T23:18:17+08:00">2024-01-17</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分類於</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Redis/" itemprop="url" rel="index"><span itemprop="name">Redis</span></a>
+                </span>
+            </span>
+
+          
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="far fa-comment"></i>
+      </span>
+      <span class="post-meta-item-text">Disqus：</span>
+    
+    <a title="disqus" href="/redis-sentinel/#disqus_thread" itemprop="discussionUrl">
+      <span class="post-comments-count disqus-comment-count" data-disqus-identifier="redis-sentinel/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+            <span class="post-meta-item" title="文章字數">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+              <span>11k</span>
+            </span>
+            <span class="post-meta-item" title="所需閱讀時間">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+              <span>8 分鐘</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="Redis-三部曲之二部曲-哨兵模式（Sentinel）"><a href="#Redis-三部曲之二部曲-哨兵模式（Sentinel）" class="headerlink" title="Redis 三部曲之二部曲-哨兵模式（Sentinel）"></a>Redis 三部曲之二部曲-哨兵模式（Sentinel）</h2><p><img src="https://i.imgur.com/APup1lq.png" alt="image"></p>
+<span id="more"></span>
+
+<center>圖片來源https://hackmd.io/@tienyulin/redis-master-slave-replication-sentinel-cluster</center>
+
+
+<h3 id="說明"><a href="#說明" class="headerlink" title="說明"></a>說明</h3><p>Redis Sentinel 是官方推薦的高可用性解決方案，他能監控多個主從集群，當發現主節點當機，能夠自動運行主重切換。<strong>本次練習延續使用上篇主從模式，針對主從模式節點實施監控。</strong></p>
+<h3 id="監控-Monitoring"><a href="#監控-Monitoring" class="headerlink" title="監控(Monitoring)"></a>監控(Monitoring)</h3><ul>
+<li>目的： Sentinel監控主節點和從節點健康狀態</li>
+<li>實現： Sentinel定期向Redis節點發送PING命令，檢查它们的響應時間和可用性。</li>
+<li>行為： 如果主節點或從節點未響應，哨兵會將其標記為主觀下線。</li>
+</ul>
+<h3 id="主觀下線-Subjective-Down"><a href="#主觀下線-Subjective-Down" class="headerlink" title="主觀下線(Subjective Down)"></a>主觀下線(Subjective Down)</h3><ul>
+<li>定義：  當一個哨兵認為某個Redis節點（主節點或從節點）不可用時，稱為主觀下線。 </li>
+<li>觸發條件： 可能由於網路問題或硬體故障等引起的單個哨兵的主觀判斷。</li>
+</ul>
+<h3 id="客觀下線-Objective-Down）"><a href="#客觀下線-Objective-Down）" class="headerlink" title="客觀下線(Objective Down）"></a>客觀下線(Objective Down）</h3><ul>
+<li>定義： 當足夠數樣的哨兵獨立地認為某個Redis節點不可用時，稱為客觀下線。</li>
+<li>觸發條件： 超過quorum數量的哨兵在獨立判斷某個節點主觀下線後，將其標記為客觀下線。</li>
+<li>quorum： 在配置中定義的哨兵數量的一半加一，用於確保在判断客觀下線時達成多數共識。</li>
+</ul>
+<h3 id="故障轉移-Failover"><a href="#故障轉移-Failover" class="headerlink" title="故障轉移(Failover)"></a>故障轉移(Failover)</h3><ul>
+<li>目的： 在主節點不可用時，將某個從節點提升為新的主節點，以保證服務的可用性。</li>
+<li>觸發條件： 當主節點被足夠數量的哨兵標記為主觀下線時，觸發故障轉移。</li>
+<li>領頭哨兵產生機制： 起初發現 Master 下線的哨兵會發起一個選舉(採用 Raft 演算法)，並要求其他哨兵選他做為領頭哨兵，領頭哨兵會負責進行節點故障的恢復。當選的標準是要有超過一半的哨兵同意，所以哨兵的數量建議是設定奇數個。</li>
+<li>步骤：<ol>
+<li>選擇一個從節點最為新的主節點。</li>
+<li>哨兵協調其他從節點切換到新主節點。</li>
+<li>更新客户端以連接到新的主節點。</li>
+<li>故障轉移完成，新的主節點對外提供服務。</li>
+</ol>
+</li>
+</ul>
+<h3 id="檔案架構"><a href="#檔案架構" class="headerlink" title="檔案架構"></a>檔案架構</h3><p><img src="https://i.imgur.com/Gh8JDcT.png" alt="image"></p>
+<h3 id="實作"><a href="#實作" class="headerlink" title="實作"></a>實作</h3><ol>
+<li>新增volume儲存位置</li>
+</ol>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">mkdir redis-shard/redis-sentinel0 \</span><br><span class="line">redis-shard/redis-sentinel1 \</span><br><span class="line">redis-shard/redis-sentinel2 </span><br></pre></td></tr></table></figure>
+
+<ol start="2">
+<li>建立Dockerfile及sentinel.conf</li>
+</ol>
+<ul>
+<li>Dockerfile</li>
+</ul>
+<figure class="highlight dockerfile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">FROM</span> redis:latest</span><br><span class="line"></span><br><span class="line"><span class="keyword">ARG</span> REDIS_PORT \</span><br><span class="line">    REDIS_MASTER_PORT \</span><br><span class="line">    REDIS_MASTER_HOST</span><br><span class="line"></span><br><span class="line"><span class="keyword">COPY</span><span class="language-bash"> sentinel.conf /etc/redis/sentinel.conf</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">RUN</span><span class="language-bash"> sed -i <span class="string">&#x27;s/REDIS_PORT/&#x27;</span><span class="variable">$REDIS_PORT</span><span class="string">&#x27;/g&#x27;</span> /etc/redis/sentinel.conf  &amp;&amp; \</span></span><br><span class="line"><span class="language-bash">    sed -i <span class="string">&#x27;s/REDIS_MASTER_HOST/&#x27;</span><span class="variable">$REDIS_MASTER_HOST</span><span class="string">&#x27;/g&#x27;</span> /etc/redis/sentinel.conf  &amp;&amp; \</span></span><br><span class="line"><span class="language-bash">    sed -i <span class="string">&#x27;s/REDIS_MASTER_PORT/&#x27;</span><span class="variable">$REDIS_MASTER_PORT</span><span class="string">&#x27;/g&#x27;</span> /etc/redis/sentinel.conf </span></span><br><span class="line">    </span><br><span class="line"><span class="keyword">ENTRYPOINT</span><span class="language-bash"> redis-sentinel /etc/redis/sentinel.conf</span></span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>sentinel.conf</li>
+</ul>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">port REDIS_PORT</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">設定要監控的 Master，最後的 2 代表判定客觀下線所需的哨兵數</span></span><br><span class="line">sentinel monitor mymaster REDIS_MASTER_HOST REDIS_MASTER_PORT 2</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">哨兵 Ping 不到 Master 超過此毫秒數會認定主觀下線，預設30秒，因測試改5秒</span></span><br><span class="line">sentinel down-after-milliseconds mymaster 5000</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">failover 超過次毫秒數即代表 failover 失敗，預設3分鐘</span></span><br><span class="line">sentinel failover-timeout mymaster 180000</span><br></pre></td></tr></table></figure>
+
+
+<ol start="3">
+<li>容器規劃</li>
+</ol>
+<ul>
+<li>查詢sentinel監控的master node</li>
+</ul>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker container inspect redis-master0 | grep IPAddres | awk &#x27;&#123;print $2&#125;&#x27; | tail -1</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker container inspect redis-master0 redis-master1 redis-master2 | grep &#x27;&quot;IPAddress&quot;\|com.docker.compose.service&#x27;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>建立sentinel container<br>修改sentinel監工的master node HOST及IP。</li>
+</ul>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">version:</span> <span class="string">&#x27;3.4&#x27;</span></span><br><span class="line"><span class="attr">services:</span></span><br><span class="line">  <span class="attr">redis-sentinel0:</span></span><br><span class="line">    <span class="attr">container_name:</span> <span class="string">redis-sentinel0</span></span><br><span class="line">    <span class="attr">build:</span> </span><br><span class="line">        <span class="attr">context:</span> <span class="string">redis</span></span><br><span class="line">        <span class="attr">args:</span></span><br><span class="line">          <span class="bullet">-</span> <span class="string">REDIS_PORT=26379</span></span><br><span class="line">          <span class="bullet">-</span> <span class="string">REDIS_MASTER_HOST=192.168.112.2</span> <span class="comment">#edit redis master host </span></span><br><span class="line">          <span class="bullet">-</span> <span class="string">REDIS_MASTER_PORT=6379</span>          <span class="comment">#edit redis master port</span></span><br><span class="line">    <span class="attr">volumes:</span> </span><br><span class="line">        <span class="bullet">-</span> <span class="string">./redis-shard/redis-sentinel0:/data</span></span><br><span class="line">    <span class="attr">ports:</span> </span><br><span class="line">      <span class="bullet">-</span> <span class="number">26379</span><span class="string">:26379</span></span><br><span class="line">    <span class="attr">networks:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">redis-net</span></span><br><span class="line"></span><br><span class="line">  <span class="attr">redis-sentinel1:</span></span><br><span class="line">    <span class="attr">container_name:</span> <span class="string">redis-sentinel1</span></span><br><span class="line">    <span class="attr">build:</span> </span><br><span class="line">        <span class="attr">context:</span> <span class="string">redis</span></span><br><span class="line">        <span class="attr">args:</span></span><br><span class="line">          <span class="bullet">-</span> <span class="string">REDIS_PORT=26380</span></span><br><span class="line">          <span class="bullet">-</span> <span class="string">REDIS_MASTER_HOST=192.168.112.2</span> <span class="comment">#edit redis master host </span></span><br><span class="line">          <span class="bullet">-</span> <span class="string">REDIS_MASTER_PORT=6379</span>          <span class="comment">#edit redis master port</span></span><br><span class="line">    <span class="attr">volumes:</span> </span><br><span class="line">        <span class="bullet">-</span> <span class="string">./redis-shard/redis-sentinel1:/data</span></span><br><span class="line">    <span class="attr">ports:</span> </span><br><span class="line">      <span class="bullet">-</span> <span class="number">26380</span><span class="string">:26380</span></span><br><span class="line">    <span class="attr">networks:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">redis-net</span></span><br><span class="line"></span><br><span class="line">  <span class="attr">redis-sentinel2:</span></span><br><span class="line">    <span class="attr">container_name:</span> <span class="string">redis-sentinel2</span></span><br><span class="line">    <span class="attr">build:</span> </span><br><span class="line">        <span class="attr">context:</span> <span class="string">redis</span></span><br><span class="line">        <span class="attr">args:</span></span><br><span class="line">          <span class="bullet">-</span> <span class="string">REDIS_PORT=26381</span></span><br><span class="line">          <span class="bullet">-</span> <span class="string">REDIS_MASTER_HOST=192.168.112.2</span> <span class="comment">#edit redis master host </span></span><br><span class="line">          <span class="bullet">-</span> <span class="string">REDIS_MASTER_PORT=6379</span>          <span class="comment">#edit redis master port</span></span><br><span class="line">    <span class="attr">volumes:</span> </span><br><span class="line">        <span class="bullet">-</span> <span class="string">./redis-shard/redis-sentinel2:/data</span></span><br><span class="line">    <span class="attr">ports:</span> </span><br><span class="line">      <span class="bullet">-</span> <span class="number">26381</span><span class="string">:26381</span></span><br><span class="line">    <span class="attr">networks:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">redis-net</span></span><br><span class="line"></span><br><span class="line"><span class="attr">networks:</span></span><br><span class="line">  <span class="attr">redis-net:</span></span><br><span class="line">    <span class="attr">name:</span> <span class="string">redis-scaling-network</span></span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>查看sentinel狀態</li>
+</ul>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">docker <span class="built_in">exec</span> -it redis-sentinel1 redis-cli -p 26380 info sentinel</span></span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">Sentinel</span></span><br><span class="line">sentinel_masters:1</span><br><span class="line">sentinel_tilt:0</span><br><span class="line">sentinel_tilt_since_seconds:-1</span><br><span class="line">sentinel_running_scripts:0</span><br><span class="line">sentinel_scripts_queue_length:0</span><br><span class="line">sentinel_simulate_failure_flags:0</span><br><span class="line">master0:name=mymaster,status=ok,address=192.168.112.2:6379,slaves=2,sentinels=3</span><br></pre></td></tr></table></figure>
+
+<h3 id="建立流程說明"><a href="#建立流程說明" class="headerlink" title="建立流程說明"></a>建立流程說明</h3><p>以redis-sentinel0為例子</p>
+<ol>
+<li>Redis Sentinel運行在哨兵模式下，監聽在26379端口，保存新的配置到磁盤及產製哨兵ID</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 05:49:17.877 * Running mode=sentinel, port=26379.</span><br><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 05:49:17.881 * Sentinel new configuration saved on disk</span><br><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 05:49:17.881 * Sentinel ID is 21722b10bad0c77589da54afe783fe1119db7af2</span><br></pre></td></tr></table></figure>
+
+<ol start="2">
+<li>哨兵開始監控名為mymaster的Redis主節點（Master），位於172.19.0.2地址，6379端口，並設置仲裁數為2，並添加從節點（Slave）連結到mymaster</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 05:49:17.881 # +monitor master mymaster 172.19.0.2 6379 quorum 2</span><br><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 05:49:17.882 * +slave slave 172.19.0.3:9001 172.19.0.3 9001 @ mymaster 172.19.0.2 6379</span><br><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 05:49:17.884 * Sentinel new configuration saved on disk</span><br><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 05:49:17.884 * +slave slave 172.19.0.4:9002 172.19.0.4 9002 @ mymaster 172.19.0.2 6379</span><br><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 05:49:17.887 * Sentinel new configuration saved on disk</span><br></pre></td></tr></table></figure>
+
+<ol start="3">
+<li>哨兵節點之間相互發現並建立通信，修復從節點的配置信息，确保其正確連結到mymaster。</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 05:49:20.092 * +sentinel sentinel 464859cce3e0077c7e6cf41bb4bf3c5346fff9a7 172.19.0.6 26381 @ mymaster 172.19.0.2 6379</span><br><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 05:49:20.098 * Sentinel new configuration saved on disk</span><br><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 05:49:20.208 * +sentinel sentinel dab60cdcfaa8d039f105a24c26725919399595f5 172.19.0.7 26380 @ mymaster 172.19.0.2 6379</span><br><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 05:49:20.212 * Sentinel new configuration saved on disk</span><br><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 05:52:18.677 * +fix-slave-config slave 172.19.0.4:9002 172.19.0.4 9002 @ mymaster 172.19.0.2 6379</span><br><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 05:52:18.677 * +fix-slave-config slave 172.19.0.3:9001 172.19.0.3 9001 @ mymaster 172.19.0.2 6379</span><br></pre></td></tr></table></figure>
+
+
+<h3 id="故障轉移實作"><a href="#故障轉移實作" class="headerlink" title="故障轉移實作"></a>故障轉移實作</h3><p>試著停止redis-master0容器查看故障轉移態樣</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker container stop redis-master0</span><br></pre></td></tr></table></figure>
+
+<ol>
+<li>首先可以看到三個哨兵都認定 master 為 sdown(主觀下線)，這時 redis-sentinel1 便認定為 odown(客觀下線)，並打算發起投票要求成為領頭哨兵。</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">redis-sentinel2  | 6:X 09 Jan 2024 08:46:04.856 # +sdown master mymaster 172.19.0.2 6379</span><br><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:04.875 # +sdown master mymaster 172.19.0.2 6379</span><br><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 08:46:04.916 # +sdown master mymaster 172.19.0.2 6379</span><br><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:04.938 # +odown master mymaster 172.19.0.2 6379 #quorum 2/2</span><br><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:04.938 # +new-epoch 1</span><br><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:04.938 # +try-failover master mymaster 172.19.0.2 6379</span><br></pre></td></tr></table></figure>
+
+<ol start="2">
+<li>三個sentinel進行投票表決，最後由redis-sentinel1當選。</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:04.938 # +try-failover master mymaster 172.19.0.2 6379</span><br><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:04.943 * Sentinel new configuration saved on disk</span><br><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:04.943 # +vote-for-leader dab60cdcfaa8d039f105a24c26725919399595f5 1</span><br><span class="line">redis-sentinel2  | 6:X 09 Jan 2024 08:46:04.949 * Sentinel new configuration saved on disk</span><br><span class="line">redis-sentinel2  | 6:X 09 Jan 2024 08:46:04.949 # +new-epoch 1</span><br><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 08:46:04.950 * Sentinel new configuration saved on disk</span><br><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 08:46:04.950 # +new-epoch 1</span><br><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 08:46:04.953 * Sentinel new configuration saved on disk</span><br><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 08:46:04.954 # +vote-for-leader dab60cdcfaa8d039f105a24c26725919399595f5 1</span><br><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:04.954 * 21722b10bad0c77589da54afe783fe1119db7af2 voted for dab60cdcfaa8d039f105a24c26725919399595f5 1</span><br><span class="line">redis-sentinel2  | 6:X 09 Jan 2024 08:46:04.956 * Sentinel new configuration saved on disk</span><br><span class="line">redis-sentinel2  | 6:X 09 Jan 2024 08:46:04.956 # +vote-for-leader dab60cdcfaa8d039f105a24c26725919399595f5 1</span><br><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:04.957 * 464859cce3e0077c7e6cf41bb4bf3c5346fff9a7 voted for dab60cdcfaa8d039f105a24c26725919399595f5 1</span><br><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:04.996 # +elected-leader master mymaster 172.19.0.2 6379</span><br></pre></td></tr></table></figure>
+
+<ol start="3">
+<li>接著 redis-sentinel1 選出了 redis-slave0(slave 172.19.0.3 9001) 作為 Master，並且下了 slaveof noone 的指令使其解除 Slave 狀態變回獨立的 Master，隨後將 redis-slave0 升格為 Master。</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:04.996 # +failover-state-select-slave master mymaster 172.19.0.2 6379</span><br><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 08:46:05.007 # +odown master mymaster 172.19.0.2 6379 #quorum 3/2</span><br><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 08:46:05.007 * Next failover delay: I will not start a failover before Tue Jan  9 08:52:05 2024</span><br><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:05.072 # +selected-slave slave 172.19.0.3:9001 172.19.0.3 9001 @ mymaster 172.19.0.2 6379</span><br><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:05.073 * +failover-state-send-slaveof-noone slave 172.19.0.3:9001 172.19.0.3 9001 @ mymaster 172.19.0.2 6379</span><br><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:05.173 * +failover-state-wait-promotion slave 172.19.0.3:9001 172.19.0.3 9001 @ mymaster 172.19.0.2 6379</span><br><span class="line">redis-sentinel2  | 6:X 09 Jan 2024 08:46:05.923 # +odown master mymaster 172.19.0.2 6379 #quorum 3/2</span><br><span class="line">redis-sentinel2  | 6:X 09 Jan 2024 08:46:05.923 * Next failover delay: I will not start a failover before Tue Jan  9 08:52:05 2024</span><br><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:05.977 * Sentinel new configuration saved on disk</span><br><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:05.978 # +promoted-slave slave 172.19.0.3:9001 172.19.0.3 9001 @ mymaster 172.19.0.2 6379</span><br></pre></td></tr></table></figure>
+
+<ol start="4">
+<li>設定完新的 Master 後，redis-sentinel1發動故障轉移重新配置從節點的狀態，從節點 172.19.0.4:9002(redis-slave1) 已经被重新配置，連接到新的主節點 172.19.0.3 9001(redis-slave0)。</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:05.978 # +failover-state-reconf-slaves master mymaster 172.19.0.2 6379</span><br><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:06.041 * +slave-reconf-sent slave 172.19.0.4:9002 172.19.0.4 9002 @ mymaster 172.19.0.2 6379</span><br></pre></td></tr></table></figure>
+
+<ol start="5">
+<li>redis-sentinel0和 redis-sentinel2 開始從 redis-sentinel1 取得設定然後更新自己的設定，至此整個故障轉移就完成了。</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 08:46:06.043 # +config-update-from sentinel dab60cdcfaa8d039f105a24c26725919399595f5 172.19.0.7 26380 @ mymaster 172.19.0.2 6379</span><br><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 08:46:06.043 # +switch-master mymaster 172.19.0.2 6379 172.19.0.3 9001</span><br><span class="line">redis-sentinel2  | 6:X 09 Jan 2024 08:46:06.042 # +config-update-from sentinel dab60cdcfaa8d039f105a24c26725919399595f5 172.19.0.7 26380 @ mymaster 172.19.0.2 6379</span><br><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:06.041 * +slave-reconf-sent slave 172.19.0.4:9002 172.19.0.4 9002 @ mymaster 172.19.0.2 6379</span><br><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 08:46:06.044 * +slave slave 172.19.0.4:9002 172.19.0.4 9002 @ mymaster 172.19.0.3 9001</span><br><span class="line">redis-sentinel2  | 6:X 09 Jan 2024 08:46:06.042 # +switch-master mymaster 172.19.0.2 6379 172.19.0.3 9001</span><br><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 08:46:06.044 * +slave slave 172.19.0.2:6379 172.19.0.2 6379 @ mymaster 172.19.0.3 9001</span><br><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 08:46:06.049 * Sentinel new configuration saved on disk</span><br><span class="line">redis-sentinel2  | 6:X 09 Jan 2024 08:46:06.043 * +slave slave 172.19.0.4:9002 172.19.0.4 9002 @ mymaster 172.19.0.3 9001</span><br><span class="line">redis-sentinel2  | 6:X 09 Jan 2024 08:46:06.043 * +slave slave 172.19.0.2:6379 172.19.0.2 6379 @ mymaster 172.19.0.3 9001</span><br><span class="line">redis-sentinel2  | 6:X 09 Jan 2024 08:46:06.048 * Sentinel new configuration saved on disk</span><br><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:06.977 * +slave-reconf-inprog slave 172.19.0.4:9002 172.19.0.4 9002 @ mymaster 172.19.0.2 6379</span><br><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:06.978 * +slave-reconf-done slave 172.19.0.4:9002 172.19.0.4 9002 @ mymaster 172.19.0.2 6379</span><br><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:07.060 # -odown master mymaster 172.19.0.2 6379</span><br><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:07.060 # +failover-end master mymaster 172.19.0.2 6379</span><br><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:07.060 # +switch-master mymaster 172.19.0.2 6379 172.19.0.3 9001</span><br><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:07.060 * +slave slave 172.19.0.4:9002 172.19.0.4 9002 @ mymaster 172.19.0.3 9001</span><br><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:07.060 * +slave slave 172.19.0.2:6379 172.19.0.2 6379 @ mymaster 172.19.0.3 9001</span><br></pre></td></tr></table></figure>
+
+<ol start="6">
+<li>此時因為 redis-master0 還是處於關閉的狀態，所以三個哨兵還是會判斷其為主觀下線，但是因為他已經成為 Slave，所以不會進行故障轉移。</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:07.065 * Sentinel new configuration saved on disk</span><br><span class="line">redis-sentinel2  | 6:X 09 Jan 2024 08:46:11.046 # +sdown slave 172.19.0.2:6379 172.19.0.2 6379 @ mymaster 172.19.0.3 9001</span><br><span class="line">redis-sentinel0  | 7:X 09 Jan 2024 08:46:11.088 # +sdown slave 172.19.0.2:6379 172.19.0.2 6379 @ mymaster 172.19.0.3 9001</span><br><span class="line">redis-sentinel1  | 7:X 09 Jan 2024 08:46:12.071 # +sdown slave 172.19.0.2:6379 172.19.0.2 6379 @ mymaster 172.19.0.3 9001</span><br></pre></td></tr></table></figure>
+
+<h3 id="心得"><a href="#心得" class="headerlink" title="心得"></a>心得</h3><p>哨兵模式在挑選新的主節點時，哨兵可能會考慮從節點的健康狀況、同步狀態、復製偏移量等因素。這確保了選擇的節點是最合適的，以提供高性能和數據一致性。每個從節點都有一個優先級，哨兵可能會選擇具有更高優先級的從節點作為新的主節點，優先級的設置可以通過配置文件進行調整。以上透由分享哨兵模式的使用範例提供給大家作為Redis高可用的選擇方案之一，配合主從模式下提供故障轉移和高可用性，<strong>適用於數據集相對較小，單機內存容量能夠滿足需求的場景。</strong></p>
+<h3 id="參考文章"><a href="#參考文章" class="headerlink" title="參考文章"></a>參考文章</h3><p><a target="_blank" rel="noopener" href="https://www.stevenchang.tw/blog/2020/12/06/redis-notes-redis-sential">Redis Notes - Sentinel (for High Availability)</a><br><a target="_blank" rel="noopener" href="https://www.modb.pro/db/622365">redis sentinel基本命令与参数</a><br><a target="_blank" rel="noopener" href="https://redis.io/docs/management/sentinel/">High availability with Redis Sentinel | Redis</a><br><a target="_blank" rel="noopener" href="https://hackmd.io/@tienyulin/redis-master-slave-replication-sentinel-cluster">Redis (六) - 主從複製、哨兵與叢集模式</a></p>
+
+    </div>
+
+    
+    
+    
+        
+
+<div>
+<ul class="post-copyright">
+  <!--
+  <li class="post-copyright-author">
+    <strong>作者： </strong>Howhow Chen
+  </li>
+  <li class="post-copyright-link">
+    <strong>文章連結：</strong>
+    <a href="http://example.com/redis-sentinel/" title="Redis Sentinel">http://example.com/redis-sentinel/</a>
+  </li>
+  -->
+  <li class="post-copyright-license">
+    <strong>版權聲明： </strong>本網誌所有文章除特別聲明外，均採用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 許可協議。轉載請註明出處！
+  </li>
+</ul>
+</div>
+
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Redis/" rel="tag"># Redis</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/redis-master-slave/" rel="prev" title="Redis Master Slave">
+      <i class="fa fa-chevron-left"></i> Redis Master Slave
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+    
+  <div class="comments">
+    <div id="disqus_thread">
+      <noscript>Please enable JavaScript to view the comments powered by Disqus.</noscript>
+    </div>
+  </div>
+  
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目錄
+        </li>
+        <li class="sidebar-nav-overview">
+          本站概要
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Redis-%E4%B8%89%E9%83%A8%E6%9B%B2%E4%B9%8B%E4%BA%8C%E9%83%A8%E6%9B%B2-%E5%93%A8%E5%85%B5%E6%A8%A1%E5%BC%8F%EF%BC%88Sentinel%EF%BC%89"><span class="nav-number">1.</span> <span class="nav-text">Redis 三部曲之二部曲-哨兵模式（Sentinel）</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AA%AA%E6%98%8E"><span class="nav-number">1.1.</span> <span class="nav-text">說明</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%9B%A3%E6%8E%A7-Monitoring"><span class="nav-number">1.2.</span> <span class="nav-text">監控(Monitoring)</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%BB%E8%A7%80%E4%B8%8B%E7%B7%9A-Subjective-Down"><span class="nav-number">1.3.</span> <span class="nav-text">主觀下線(Subjective Down)</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%A2%E8%A7%80%E4%B8%8B%E7%B7%9A-Objective-Down%EF%BC%89"><span class="nav-number">1.4.</span> <span class="nav-text">客觀下線(Objective Down）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%95%85%E9%9A%9C%E8%BD%89%E7%A7%BB-Failover"><span class="nav-number">1.5.</span> <span class="nav-text">故障轉移(Failover)</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AA%94%E6%A1%88%E6%9E%B6%E6%A7%8B"><span class="nav-number">1.6.</span> <span class="nav-text">檔案架構</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AF%A6%E4%BD%9C"><span class="nav-number">1.7.</span> <span class="nav-text">實作</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BB%BA%E7%AB%8B%E6%B5%81%E7%A8%8B%E8%AA%AA%E6%98%8E"><span class="nav-number">1.8.</span> <span class="nav-text">建立流程說明</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%95%85%E9%9A%9C%E8%BD%89%E7%A7%BB%E5%AF%A6%E4%BD%9C"><span class="nav-number">1.9.</span> <span class="nav-text">故障轉移實作</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BF%83%E5%BE%97"><span class="nav-number">1.10.</span> <span class="nav-text">心得</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8F%83%E8%80%83%E6%96%87%E7%AB%A0"><span class="nav-number">1.11.</span> <span class="nav-text">參考文章</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Howhow Chen"
+      src="https://cdn.dribbble.com/userupload/2624051/file/original-0c2e27a535ca15358be82cb68805de49.png?compress=1&resize=1200x900">
+  <p class="site-author-name" itemprop="name">Howhow Chen</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">5</span>
+          <span class="site-state-item-name">文章</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">6</span>
+        <span class="site-state-item-name">分類</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">標籤</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/HowhowChen" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;HowhowChen" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2024</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder"><a target="_blank" rel="noopener" href='https://github.com/HowhowChen'>Howhow</a></span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 強力驅動
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+<script>
+  function loadCount() {
+    var d = document, s = d.createElement('script');
+    s.src = 'https://howhowproject.disqus.com/count.js';
+    s.id = 'dsq-count-scr';
+    (d.head || d.body).appendChild(s);
+  }
+  // defer loading until the whole page loading is completed
+  window.addEventListener('load', loadCount, false);
+</script>
+<script>
+  var disqus_config = function() {
+    this.page.url = "http://example.com/redis-sentinel/";
+    this.page.identifier = "redis-sentinel/";
+    this.page.title = "Redis Sentinel";
+    this.language = "zh_TW";
+    };
+  NexT.utils.loadComments(document.querySelector('#disqus_thread'), () => {
+    if (window.DISQUS) {
+      DISQUS.reset({
+        reload: true,
+        config: disqus_config
+      });
+    } else {
+      var d = document, s = d.createElement('script');
+      s.src = 'https://howhowproject.disqus.com/embed.js';
+      s.setAttribute('data-timestamp', '' + +new Date());
+      (d.head || d.body).appendChild(s);
+    }
+  });
+</script>
+
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js">
+  <script type="text/javascript" src="/js/myjs/snow.js"></script>
+
+
+</body>
+</html>

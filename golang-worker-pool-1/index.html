@@ -30,16 +30,16 @@
   gtag('config', 'G-B5M8X3XDHT');
 </script>
 
-  <meta name="description" content="優化Worker Pool的奇技淫巧 圖片來源https:&#x2F;&#x2F;itnext.io&#x2F;explain-to-me-go-concurrency-worker-pool-pattern-like-im-five-e5f1be71">
+  <meta name="description" content="優化Worker Pool的奇技淫巧">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Golang Worker Pool練習-1">
 <meta property="og:url" content="http://example.com/golang-worker-pool-1/">
 <meta property="og:site_name" content="Howhow Project">
-<meta property="og:description" content="優化Worker Pool的奇技淫巧 圖片來源https:&#x2F;&#x2F;itnext.io&#x2F;explain-to-me-go-concurrency-worker-pool-pattern-like-im-five-e5f1be71">
+<meta property="og:description" content="優化Worker Pool的奇技淫巧">
 <meta property="og:locale" content="zh_TW">
 <meta property="og:image" content="https://miro.medium.com/v2/resize:fit:720/format:webp/1*Ya3fa36roBBhZlMl-kChXw.png">
 <meta property="article:published_time" content="2023-12-20T16:58:54.000Z">
-<meta property="article:modified_time" content="2023-12-20T17:54:51.847Z">
+<meta property="article:modified_time" content="2024-01-17T15:15:12.262Z">
 <meta property="article:author" content="Howhow Chen">
 <meta property="article:tag" content="Golang">
 <meta name="twitter:card" content="summary">
@@ -217,10 +217,16 @@
                 <i class="far fa-calendar"></i>
               </span>
               <span class="post-meta-item-text">發表於</span>
-              
 
-              <time title="創建時間：2023-12-21 00:58:54 / 修改時間：01:54:51" itemprop="dateCreated datePublished" datetime="2023-12-21T00:58:54+08:00">2023-12-21</time>
+              <time title="創建時間：2023-12-21 00:58:54" itemprop="dateCreated datePublished" datetime="2023-12-21T00:58:54+08:00">2023-12-21</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新於</span>
+                <time title="修改時間：2024-01-17 23:15:12" itemprop="dateModified" datetime="2024-01-17T23:15:12+08:00">2024-01-17</time>
+              </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
                 <i class="far fa-folder"></i>
@@ -273,8 +279,9 @@
 
       
         <h2 id="優化Worker-Pool的奇技淫巧"><a href="#優化Worker-Pool的奇技淫巧" class="headerlink" title="優化Worker Pool的奇技淫巧"></a>優化Worker Pool的奇技淫巧</h2><p><img src="https://miro.medium.com/v2/resize:fit:720/format:webp/1*Ya3fa36roBBhZlMl-kChXw.png"></p>
-<center>圖片來源https://itnext.io/explain-to-me-go-concurrency-worker-pool-pattern-like-im-five-e5f1be71</center>
 <span id="more"></span>
+<center>圖片來源https://itnext.io/explain-to-me-go-concurrency-worker-pool-pattern-like-im-five-e5f1be71</center>
+
 
 <h3 id="題目說明"><a href="#題目說明" class="headerlink" title="題目說明"></a>題目說明</h3><p>設計一個隨機生成亂數，計算亂數每一位數字總和（e.g. 69 &#x3D;&gt; 6+9&#x3D;15）。並請開啟一個Goroutine生成亂數，24個Goroutine計算亂數每一位數字總和。<strong>Bonus 五秒後關閉所有Goroutine。</strong></p>
 <p>詳見<a target="_blank" rel="noopener" href="https://blog.51cto.com/u_15127617/3300755">題目來源</a></p>
@@ -433,7 +440,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">4</span>
+          <span class="site-state-item-count">5</span>
           <span class="site-state-item-name">文章</span>
         </a>
       </div>
@@ -478,7 +485,7 @@
 <div class="copyright">
   
   &copy; 
-  <span itemprop="copyrightYear">2023</span>
+  <span itemprop="copyrightYear">2024</span>
   <span class="with-love">
     <i class="fa fa-heart"></i>
   </span>
